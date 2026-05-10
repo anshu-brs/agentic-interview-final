@@ -194,17 +194,6 @@ curl -X POST http://127.0.0.1:8000/api/analyse-resume \
 
 ---
 
-## Known Issues & Workarounds
-
-| Issue | Workaround |
-|-------|-----------|
-| `ffmpeg not found` error | Install ffmpeg and ensure it is in your PATH |
-| Groq rate limit (429) | Wait 60 seconds; free tier has per-minute limits |
-| Web Speech API not working | Switch to Chrome or Edge; Firefox is not supported |
-| Blank resume analysis | Ensure you are uploading a text-based PDF (not a scanned image) |
-| `numba` slow first start | Normal — librosa JIT-compiles on first use; subsequent runs are fast |
-
----
 
 ## Scoring Guide
 
