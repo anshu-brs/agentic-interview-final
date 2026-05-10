@@ -1,0 +1,34 @@
+{
+  "_description": "Expected output from /api/analyse-resume for sample_resume.txt",
+
+  "resume_analysis": {
+    "name": "Priya Sharma",
+    "email": "priya.sharma@email.com",
+    "summary": "Backend engineer with 2 years experience building payment microservices and REST APIs in Python/Node.js with AWS deployments.",
+    "skills": ["Python", "FastAPI", "Node.js", "PostgreSQL", "Redis", "Docker", "AWS", "MongoDB"],
+    "inferred_roles": ["Backend Engineer", "Full Stack Developer", "Cloud/DevOps Engineer"],
+    "experience_years": 2,
+    "skill_gaps": {
+      "Backend Engineer": ["System design at scale", "Kubernetes", "CI/CD pipelines"],
+      "Full Stack Developer": ["Advanced React", "TypeScript", "CSS frameworks"],
+      "Cloud/DevOps Engineer": ["Terraform", "Kubernetes", "Monitoring (Prometheus/Grafana)"]
+    }
+  },
+
+  "interview_sample": {
+    "q1_warmup": "Tell me about the payment microservice you built — what was the most technically challenging part?",
+    "q3_technical": "How does Redis caching work and what cache invalidation strategy did you use in your project?",
+    "q6_tough": "Design a rate-limiting system for an API that serves 1 million requests/day.",
+    "q9_edge_case": "What happens to in-flight transactions if your payment service crashes mid-operation? How would you ensure consistency?"
+  },
+
+  "feedback_sample": {
+    "overall_score": 74,
+    "overall_verdict": "Hire",
+    "summary": "Strong practical backend experience with real production systems. Good understanding of caching and async patterns. System design knowledge needs deepening for senior roles.",
+    "strengths": ["Hands-on AWS experience", "Production-grade Redis/PostgreSQL usage", "Clear communication about trade-offs"],
+    "areas_to_improve": ["System design at scale", "Distributed transactions", "Kubernetes/container orchestration"],
+    "communication_insights": "Spoke at a steady 130 wpm with good clarity. Occasional hesitation on unfamiliar terms — recommend practising think-aloud problem solving.",
+    "recommended_resources": ["Designing Data-Intensive Applications (Kleppmann)", "AWS Solutions Architect study guide", "System Design Interview by Alex Xu"]
+  }
+}

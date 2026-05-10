@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resume Analyser — MockMaster</title>
+  <link rel="stylesheet" href="/static/css/main.css"/>
+</head>
+
+<body>
+
+<nav>
+  <a class="nav-logo" href="/"><span>Mock</span>Master</a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/resume.html" class="active">Resume</a></li>
+    <li><a href="/jobs.html">Jobs</a></li>
+    <li><a href="/interview.html">Interview</a></li>
+  </ul>
+</nav>
+
+<div class="page">
+
+  <!-- Header -->
+  <section class="hero" style="padding: 80px 32px 40px;">
+    <div class="hero-inner">
+      <div class="hero-eyebrow fade-in">
+        <span class="badge badge-amber">✦ Resume Intelligence</span>
+      </div>
+      <h1 class="hero-title fade-in-up delay-1" style="font-size: 3rem;">
+        Analyse your<br/>
+        <span class="hero-accent">resume.</span>
+      </h1>
+      <p class="hero-sub fade-in-up delay-2">
+        We'll extract your skills, infer roles, and show what's missing.
+      </p>
+    </div>
+  </section>
+
+  <section class="features" style="padding-top: 0;">
+    <div style="max-width: 800px; margin: auto;">
+
+      <!-- Upload card -->
+      <div class="card fade-in-up delay-2">
+        <div class="section-label">Upload</div>
+        <div class="section-title">Your Resume (PDF)</div>
+        <div class="mt-16">
+          <input type="file" id="resumeFile" accept=".pdf" class="input"/>
+        </div>
+        <div class="mt-16 flex items-center gap-12">
+          <button class="btn btn-primary" onclick="uploadResume()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Analyse Resume
+          </button>
+          <div id="loading" class="flex items-center gap-8" style="display:none;">
+            <div class="spinner"></div>
+            <span style="color:var(--text2);">Analysing with AI...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="results" style="display:none;">
+
+        <!-- Candidate header -->
+        <div class="card mt-24 fade-in-up" id="candidateHeader" style="background: linear-gradient(135deg, var(--surface), var(--bg3));">
+          <div class="flex items-center gap-16">
+            <div style="width:56px; height:56px; border-radius:50%; background:var(--amber-dim); border:2px solid var(--amber); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <svg width="24" height="24" fill="none" stroke="var(--amber)" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <div>
+              <div id="candidateName" style="font-family:var(--font-display); font-size:1.3rem; font-weight:700;"></div>
+              <div id="candidateEmail" style="color:var(--text2); font-size:0.88rem; margin-top:2px;"></div>
+              <div id="candidateSeniority" style="margin-top:6px;"></div>
+            </div>
+          </div>
+          <div id="candidateSummary" class="mt-16" style="color:var(--text2); font-size:0.9rem; line-height:1.7; padding-top:16px; border-top:1px solid var(--border);"></div>
+        </div>
+
+        <!-- Skills -->
+        <div class="card mt-24 fade-in-up">
+          <div class="section-label">Skills</div>
+          <div class="section-title">What you're good at</div>
+          <div id="skills" class="mt-16 flex gap-8" style="flex-wrap:wrap;"></div>
+        </div>
+
+        <!-- Strengths -->
+        <div class="card mt-24 fade-in-up">
+          <div class="section-label">Strengths</div>
+          <div class="section-title">Your standout qualities</div>
+          <div id="strengths" class="mt-16 flex flex-col gap-8"></div>
+        </div>
+
+        <!-- Roles -->
+        <div class="card mt-24 fade-in-up">
+          <div class="section-label">Roles</div>
+          <div class="section-title">Best fit for you</div>
+          <p style="color:var(--text2); font-size:0.85rem; margin-top:4px;">Click a role to start a tailored mock interview or find matching jobs.</p>
+          <div id="roles" class="mt-16 flex flex-col gap-16"></div>
+        </div>
+
+        <!-- Skill gaps -->
+        <div class="card mt-24 fade-in-up">
+          <div class="section-label">Skill Gaps</div>
+          <div class="section-title">What to learn next</div>
+          <div id="gaps" class="mt-16"></div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+<script src="/static/js/utils.js"></script>
+
+<script>
+async function uploadResume() {
+  const fileInput = document.getElementById("resumeFile");
+  const file = fileInput.files[0];
+
+  if (!file) {
+    toast("Please select a PDF file", "error");
+    return;
+  }
+  if (!file.name.endsWith(".pdf")) {
+    toast("Only PDF files are accepted", "error");
+    return;
+  }
+
+  const loading = document.getElementById("loading");
+  const results = document.getElementById("results");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  loading.style.display = "flex";
+  results.style.display = "none";
+
+  try {
+    const res = await fetch("/api/analyse-resume", {
+      method: "POST",
+      body: formData
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Failed to analyse resume");
+    }
+
+    const data = await res.json();
+    State.set("resumeData", data);
+    renderResults(data);
+
+    loading.style.display = "none";
+    results.style.display = "block";
+    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+
+  } catch (err) {
+    toast(err.message, "error");
+    loading.style.display = "none";
+  }
+}
+
+function renderResults(data) {
+  // Candidate header
+  document.getElementById("candidateName").textContent  = data.name  || "Candidate";
+  document.getElementById("candidateEmail").textContent = data.email || "";
+  document.getElementById("candidateSummary").textContent = data.summary || "";
+
+  const expYears = data.experience_years || 0;
+  const seniority = expYears === 0 ? "Fresher" : expYears <= 2 ? "Junior" : expYears <= 5 ? "Mid-level" : "Senior";
+  document.getElementById("candidateSeniority").innerHTML =
+    `<span class="badge badge-amber">${seniority} · ${expYears} yr${expYears !== 1 ? "s" : ""} exp</span>`;
+
+  // Skills
+  document.getElementById("skills").innerHTML =
+    (data.skills || []).map(s => `<span class="tag highlight">${s}</span>`).join("");
+
+  // Strengths
+  document.getElementById("strengths").innerHTML =
+    (data.strengths || []).map(s => `
+      <div class="flex items-center gap-8">
+        <span style="color:var(--teal); flex-shrink:0;">✓</span>
+        <span style="color:var(--text2); font-size:0.9rem;">${s}</span>
+      </div>`).join("");
+
+  // Roles
+  const rolesDiv = document.getElementById("roles");
+  rolesDiv.innerHTML = "";
+  (data.inferred_roles || []).forEach((role, i) => {
+    const el = document.createElement("div");
+    el.className = "card flex items-center justify-between";
+    el.style.cssText = "padding: 16px 20px; animation-delay:" + (i * 0.1) + "s";
+    el.innerHTML = `
+      <div>
+        <div style="font-weight:600; font-size:1rem;">${role}</div>
+        <div style="color:var(--text3); font-size:0.8rem; margin-top:2px;">Click to practice or explore jobs</div>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-outline btn-sm" onclick="goInterview('${role}')">
+          🎙 Practice Interview
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="goJobs('${role}')">
+          💼 Find Jobs
+        </button>
+      </div>`;
+    rolesDiv.appendChild(el);
+  });
+
+  // Skill gaps
+  const gapsDiv = document.getElementById("gaps");
+  gapsDiv.innerHTML = "";
+  const gaps = data.skill_gaps || {};
+  if (Object.keys(gaps).length === 0) {
+    gapsDiv.innerHTML = `<p style="color:var(--text3);">No significant gaps detected for the recommended roles.</p>`;
+  } else {
+    Object.entries(gaps).forEach(([role, missingSkills]) => {
+      const wrapper = document.createElement("div");
+      wrapper.style.marginBottom = "20px";
+      wrapper.innerHTML = `
+        <div style="font-weight:600; font-size:0.9rem; color:var(--text); margin-bottom:8px;">
+          ${role}
+        </div>
+        <div class="flex gap-8" style="flex-wrap:wrap;">
+          ${(missingSkills || []).map(s => `<span class="tag">${s}</span>`).join("")}
+        </div>`;
+      gapsDiv.appendChild(wrapper);
+    });
+  }
+}
+
+function goInterview(role) {
+  State.set("selectedRole", role);
+  window.location.href = "/interview.html";
+}
+
+function goJobs(role) {
+  State.set("selectedRole", role);
+  window.location.href = "/jobs.html";
+}
+</script>
+
+</body>
+</html>

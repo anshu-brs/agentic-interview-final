@@ -1,0 +1,28 @@
+Priya Sharma
+priya.sharma@email.com | +91-9876543210 | linkedin.com/in/priyasharma | github.com/priyasharma
+
+SUMMARY
+Software engineer with 2 years of experience building backend services and REST APIs in Python and Node.js. Comfortable with cloud deployments on AWS. Seeking roles in backend engineering or full-stack development.
+
+SKILLS
+Python, JavaScript, Node.js, FastAPI, Flask, React (basic), PostgreSQL, MongoDB, Redis, Docker, AWS (EC2, S3, Lambda), Git, REST APIs, GraphQL (basic)
+
+WORK EXPERIENCE
+Backend Engineer — Fintech Startup, Bangalore (Jan 2023 – Present)
+- Built payment processing microservice handling 50k transactions/day using FastAPI + PostgreSQL
+- Reduced API latency by 40% via Redis caching layer
+- Deployed services on AWS EC2 with auto-scaling groups
+
+Software Engineer Intern — IT Services Company, Hyderabad (Jun 2022 – Dec 2022)
+- Developed internal dashboard using React and Node.js
+- Wrote unit tests achieving 85% code coverage
+
+EDUCATION
+B.Tech Computer Science — JNTU Hyderabad, 2022 (CGPA: 8.2)
+
+PROJECTS
+- URL Shortener Service: High-throughput URL shortener with Redis + PostgreSQL, deployed on AWS Lambda
+- Chat Application: Real-time WebSocket chat using Node.js and MongoDB
+
+CERTIFICATIONS
+AWS Certified Cloud Practitioner (2023)

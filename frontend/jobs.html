@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Job Matches — MockMaster</title>
+
+  <link rel="stylesheet" href="/static/css/main.css"/>
+</head>
+
+<body>
+
+<nav>
+  <a class="nav-logo" href="/"><span>Mock</span>Master</a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/resume.html">Resume</a></li>
+    <li><a href="/jobs.html" class="active">Jobs</a></li>
+    <li><a href="/interview.html">Interview</a></li>
+  </ul>
+</nav>
+
+<div class="page">
+
+<!-- HEADER -->
+<section class="hero" style="padding:80px 32px 40px;">
+  <div class="hero-inner" style="max-width:1000px; margin:auto;">
+
+    <div class="hero-eyebrow">
+      <span class="badge badge-teal">✦ AI Job Matching</span>
+    </div>
+
+    <h1 class="hero-title" style="font-size:2.2rem;">
+      Your best-fit <span class="hero-accent">job roles</span>
+    </h1>
+
+    <p class="hero-sub mt-8">
+      Based on your resume, skills, and experience.
+    </p>
+
+  </div>
+</section>
+
+<!-- MAIN CONTENT -->
+<section style="max-width:1000px; margin:auto; padding:0 32px 40px;">
+
+  <!-- EMPTY STATE -->
+  <div id="emptyState" class="card text-center">
+    <div class="section-title">No data yet</div>
+    <p class="mt-8" style="color:var(--text2);">
+      Upload your resume first to get job matches.
+    </p>
+
+    <div class="mt-24">
+      <a href="/resume.html" class="btn btn-primary">
+        Analyse Resume →
+      </a>
+    </div>
+  </div>
+
+  <!-- JOB RESULTS -->
+  <div id="jobsContainer" class="flex flex-col gap-16" style="display:none;"></div>
+
+</section>
+
+</div>
+
+<script src="/static/js/utils.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", loadJobs);
+
+async function loadJobs() {
+  const resumeData = State.get("resumeData");
+
+  if (!resumeData) {
+    return; // show empty state
+  }
+
+  document.getElementById("emptyState").style.display = "none";
+
+  try {
+    const res = await fetch("/api/jobs", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+  resume_summary: resumeData.summary,   // 🔥 ADD THIS
+  skills: resumeData.skills,
+  experience_years: resumeData.experience_years,
+  roles: resumeData.inferred_roles
+})
+    });
+
+    const data = await res.json();
+    console.log("Jobs API response:", data);
+    renderJobs(data.jobs);
+
+  } catch (err) {
+    toast("Failed to fetch jobs", "error");
+  }
+}
+
+function renderJobs(jobs) {
+  const container = document.getElementById("jobsContainer");
+  container.style.display = "flex";
+
+  container.innerHTML = jobs.map(job => `
+    <div class="card">
+
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="section-title">${job.title}</div>
+          <div style="color:var(--text2);">${job.company}</div>
+        </div>
+
+        <div class="tag highlight">${job.match_score}% Match</div>
+      </div>
+
+      <div class="mt-16">
+        <strong>Skills Match:</strong>
+        <div class="mt-8 flex gap-8 flex-wrap">
+          ${(job.required_skills || []).map(s =>
+            `<span class="tag highlight">${s}</span>`
+          ).join("")}
+        </div>
+      </div>
+
+      <div class="mt-16">
+        <strong>Missing Skills:</strong>
+        <div class="mt-8 flex gap-8 flex-wrap">
+          ${(job.missing_skills || []).map(s =>
+            `<span class="tag">${s}</span>`
+          ).join("")}
+        </div>
+      </div>
+
+      <div class="mt-16 flex justify-between items-center">
+        <div style="color:var(--text2);">
+          ${job.salary_range || "Salary not specified"}
+        </div>
+
+        <a href="${job.apply_link || '#'}" target="_blank" class="btn btn-secondary btn-sm">
+          Apply →
+        </a>
+      </div>
+
+    </div>
+  `).join("");
+}
+</script>
+
+</body>
+</html>

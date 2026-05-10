@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+PyMuPDF
+python-dotenv
+pydantic
+httpx
+numpy
+soundfile
+librosa
+ffmpeg-python
+pydub
+groq
+requests

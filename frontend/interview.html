@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mock Interview — MockMaster</title>
+  <link rel="stylesheet" href="/static/css/main.css"/>
+  <!-- face-api.js: real browser-side CV — face detection, expressions, landmarks -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <style>
+    #micBtn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 18px; border-radius: var(--radius-sm);
+      font-family: var(--font-body); font-size: 0.875rem; font-weight: 500;
+      cursor: pointer; border: 1px solid var(--border2);
+      background: var(--surface2); color: var(--text2);
+      transition: all 0.2s ease; white-space: nowrap; flex-shrink: 0;
+    }
+    #micBtn:hover:not(:disabled) { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    #micBtn.recording {
+      background: var(--coral-dim); border-color: var(--coral); color: var(--coral);
+      animation: pulse-ring 1.4s ease-in-out infinite;
+    }
+    #micBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+    @keyframes pulse-ring {
+      0%,100% { box-shadow: 0 0 0 0 rgba(255,107,107,0.35); }
+      50%      { box-shadow: 0 0 0 7px rgba(255,107,107,0); }
+    }
+
+    #waveCanvas { display:none; width:100%; height:48px; border-radius:var(--radius-sm); background:var(--bg3); margin-top:10px; }
+    #waveCanvas.active { display:block; }
+    #interimText { font-size:0.78rem; color:var(--text3); font-style:italic; min-height:18px; margin-top:6px; }
+    #speechUnsupported { display:none; font-size:0.78rem; color:var(--coral); margin-top:6px; }
+
+    .answer-toolbar { display:flex; align-items:flex-start; gap:10px; }
+    .answer-toolbar textarea { flex:1; }
+
+    /* Video */
+    .video-panel { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-top:12px; }
+    #videoFeed { width:260px; border-radius:12px; border:1px solid var(--border2); background:#000; flex-shrink:0; }
+    .video-unavailable {
+      width:260px; height:146px; border-radius:12px;
+      border:1px solid var(--border); background:var(--bg3);
+      display:flex; align-items:center; justify-content:center;
+      flex-direction:column; gap:8px; flex-shrink:0;
+    }
+    .video-metrics-col { flex:1; min-width:200px; }
+
+    /* Analysis */
+    #audioAnalysis { display:none; margin-top:16px; padding:16px 20px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); }
+    .analysis-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:12px; }
+    .audio-metric { text-align:center; padding:12px; background:var(--surface); border-radius:var(--radius-sm); border:1px solid var(--border); }
+    .audio-metric .metric-val { font-family:var(--font-display); font-size:1.4rem; font-weight:800; line-height:1; margin-bottom:4px; }
+    .audio-metric .metric-label { font-size:0.72rem; color:var(--text2); text-transform:uppercase; letter-spacing:0.08em; }
+    .score-high { color:var(--teal); }
+    .score-mid  { color:var(--amber); }
+    .score-low  { color:var(--coral); }
+    .tone-badge { display:inline-block; padding:2px 10px; border-radius:100px; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; }
+    .tone-flat       { background:var(--coral-dim); color:var(--coral); }
+    .tone-moderate   { background:var(--amber-dim); color:var(--amber); }
+    .tone-expressive { background:var(--teal-dim);  color:var(--teal);  }
+    .tone-unknown    { background:var(--surface2);  color:var(--text2); }
+    .audio-notes { margin-top:12px; font-size:0.84rem; color:var(--text2); line-height:1.7; list-style:none; padding:0; }
+    .audio-notes li { margin-bottom:4px; }
+
+    .score-bar-row { display:flex; align-items:center; gap:10px; margin-top:6px; }
+    .score-bar-track { flex:1; height:5px; background:var(--surface2); border-radius:100px; overflow:hidden; }
+    .score-bar-fill  { height:100%; border-radius:100px; transition:width 0.8s ease; }
+
+    /* Adaptive banner */
+    #adaptiveBanner { display:none; padding:10px 16px; border-radius:var(--radius-sm); font-size:0.84rem; margin-top:12px; }
+    #adaptiveBanner.easier { border-left:3px solid var(--teal);  background:var(--teal-dim);  color:var(--teal);  }
+    #adaptiveBanner.harder { border-left:3px solid var(--amber); background:var(--amber-dim); color:var(--amber); }
+
+    /* Rate-limit warning */
+    #rateLimitBanner {
+      display:none; padding:12px 16px; border-radius:var(--radius-sm);
+      border-left:3px solid var(--coral); background:var(--coral-dim); color:var(--coral);
+      font-size:0.84rem; margin-top:12px; line-height:1.6;
+    }
+
+    /* Topic pill */
+    .topic-pill {
+      display:inline-block; padding:2px 10px; border-radius:100px;
+      font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em;
+      background:var(--surface2); color:var(--text3); margin-left:6px;
+    }
+
+    /* Final report */
+    .final-section-title { font-family:var(--font-display); font-size:0.68rem; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; color:var(--amber); margin:20px 0 8px; }
+    .verdict-badge { display:inline-block; padding:6px 20px; border-radius:100px; font-size:0.95rem; font-weight:700; margin-top:4px; }
+
+    @media(max-width:600px) {
+      .analysis-grid { grid-template-columns:repeat(2,1fr); }
+      #videoFeed, .video-unavailable { width:100%; }
+    }
+  </style>
+</head>
+
+<body>
+<nav>
+  <a class="nav-logo" href="/"><span>Mock</span>Master</a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/resume.html">Resume</a></li>
+    <li><a href="/jobs.html">Jobs</a></li>
+    <li><a href="/interview.html" class="active">Interview</a></li>
+  </ul>
+</nav>
+
+<div class="page">
+  <section class="hero" style="padding:80px 32px 40px;">
+    <div class="hero-inner">
+      <div class="hero-eyebrow">
+        <span class="badge badge-coral">✦ Live Interview</span>
+        <span id="audioStatusBadge" class="badge badge-teal"  style="display:none;">🎙 Audio Active</span>
+        <span id="videoStatusBadge" class="badge badge-amber" style="display:none;">📹 Camera Active</span>
+      </div>
+      <h1 class="hero-title" style="font-size:2.8rem;">Mock Interview</h1>
+      <p class="hero-sub">Role: <span id="roleName" style="color:var(--amber);"></span></p>
+    </div>
+  </section>
+
+  <section class="features" style="padding-top:0;">
+    <div style="max-width:900px; margin:auto;">
+
+      <!-- VIDEO CARD -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-label">Live Camera</div>
+        <div class="video-panel">
+          <div id="videoContainer">
+            <video id="videoFeed" autoplay muted playsinline></video>
+          </div>
+          <div class="video-metrics-col">
+            <div class="section-label" style="margin-bottom:8px;">Visual Analysis</div>
+            <div id="videoMetrics">
+              <div style="color:var(--text3); font-size:0.84rem; line-height:1.6;">
+                Camera active.<br/>Visual scores appear after each answer.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUESTION CARD -->
+      <div class="card">
+        <div class="progress-bar mb-16">
+          <div id="progressFill" class="progress-fill" style="width:0%"></div>
+        </div>
+
+        <div>
+          <div class="section-label" style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+            Question
+            <span id="qCounter"       style="color:var(--text3); font-size:0.7rem;"></span>
+            <span id="difficultyBadge" class="badge badge-gray"  style="font-size:0.68rem;"></span>
+            <span id="topicPill"       class="topic-pill"></span>
+          </div>
+          <div id="question" class="section-title">Loading...</div>
+        </div>
+
+        <!-- Rate-limit warning -->
+        <div id="rateLimitBanner">
+          ⏳ Gemini API rate limit hit (free tier). Retrying automatically…
+          <span id="retryCountdown"></span>
+          <br/><small style="color:var(--text2);">This happens on the free tier. It will retry up to 4 times automatically.</small>
+        </div>
+
+        <!-- Adaptive banner -->
+        <div id="adaptiveBanner"></div>
+
+        <!-- Answer -->
+        <div class="mt-24">
+          <div class="answer-toolbar">
+            <textarea id="answerInput" class="input" rows="5"
+              placeholder="Press the mic to speak, or type your answer..."></textarea>
+            <button id="micBtn" onclick="toggleMic()" title="Click to speak">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4z"/>
+                <path d="M19 11a7 7 0 0 1-14 0"/>
+                <line x1="12" y1="18" x2="12" y2="23"/>
+                <line x1="8"  y1="23" x2="16" y2="23"/>
+              </svg>
+              <span id="micLabel">Speak</span>
+            </button>
+          </div>
+          <canvas id="waveCanvas"></canvas>
+          <div id="interimText"></div>
+          <div id="speechUnsupported">⚠ Speech recognition not supported. Use Chrome or Edge.</div>
+        </div>
+
+        <div class="mt-16 flex justify-between items-center">
+          <div id="status" class="flex items-center gap-8" style="display:none;">
+            <div class="spinner"></div>
+            <span id="statusText">Evaluating…</span>
+          </div>
+          <button id="nextBtn" class="btn btn-primary" onclick="submitAnswer()">
+            Submit Answer →
+          </button>
+        </div>
+      </div>
+
+      <!-- PER-QUESTION FEEDBACK -->
+      <div id="feedbackCard" class="card mt-24" style="display:none;">
+        <div class="section-label">Feedback</div>
+        <div id="feedbackText" class="mt-8"></div>
+
+        <div id="audioAnalysis">
+          <div class="section-label" style="margin-top:16px; margin-bottom:0;">🎙 Audio Delivery</div>
+          <div class="analysis-grid" id="audioMetrics"></div>
+          <ul class="audio-notes" id="audioNotes"></ul>
+        </div>
+
+        <div id="videoFeedbackPanel" style="display:none; margin-top:16px; padding:16px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius);">
+          <div class="section-label" style="margin-bottom:8px;">📹 Visual Presence</div>
+          <div class="analysis-grid" id="videoMetricsFeedback"></div>
+        </div>
+      </div>
+
+      <!-- FINAL REPORT -->
+      <div id="finalReport" class="card mt-24" style="display:none;">
+        <div class="section-label">Final Report</div>
+        <div id="finalContent"></div>
+      </div>
+
+    </div>
+  </section>
+</div>
+
+<script src="/static/js/utils.js"></script>
+<script>
+/* ════════════════════════════════════
+   STATE
+════════════════════════════════════ */
+let questionIndex    = 0;
+let history          = [];       // full history sent to backend
+let usedTopics       = [];       // topic diversity tracking
+let currentQuestion  = "";
+let currentTopic     = "";
+let questionNumber   = 1;
+let currentDifficulty= "warm-up";
+const TOTAL_QUESTIONS = 10;
+let videoScores      = [];
+
+/* ════════════════════════════════════
+   BOOT
+════════════════════════════════════ */
+document.addEventListener("DOMContentLoaded", async () => {
+  const role       = State.get("selectedRole");
+  const resumeData = State.get("resumeData");
+
+  if (!role || !resumeData) {
+    toast("No resume/role found. Please upload your resume first.", "error");
+    setTimeout(() => window.location.href = "/resume.html", 2500);
+    return;
+  }
+
+  document.getElementById("roleName").innerText = role;
+
+  // ── Show a loading spinner in the question box immediately ──
+  document.getElementById("question").innerHTML =
+    `<span style="color:var(--text3); font-size:1rem; font-weight:400;">
+      <span class="spinner" style="display:inline-block; vertical-align:middle; margin-right:10px;"></span>
+      Preparing your first question…
+    </span>`;
+
+  // ── Start interview immediately — don't wait for camera/mic ──
+  startInterview();
+
+  // ── Camera and mic initialise in background (don't block question loading) ──
+  initSpeechRecognition();
+  initMediaRecorder().catch(() => {});
+  initCamera().catch(() => {});
+});
+
+/* ════════════════════════════════════
+   CAMERA
+════════════════════════════════════ */
+let videoStream = null;
+
+async function initCamera() {
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    document.getElementById("videoFeed").srcObject = videoStream;
+    document.getElementById("videoStatusBadge").style.display = "inline-flex";
+    // Start real CV face sampling
+    startFaceSampling();
+  } catch (err) {
+    console.warn("Camera unavailable:", err.message);
+    document.getElementById("videoContainer").innerHTML = `
+      <div class="video-unavailable">
+        <svg width="32" height="32" fill="none" stroke="var(--text3)" stroke-width="1.5" viewBox="0 0 24 24">
+          <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/>
+          <line x1="2" y1="2" x2="22" y2="22"/>
+        </svg>
+        <span style="color:var(--text3); font-size:0.78rem;">Camera unavailable</span>
+      </div>`;
+    document.getElementById("videoMetrics").innerHTML =
+      `<div style="color:var(--coral); font-size:0.84rem;">⚠ Camera access denied. Allow camera and refresh.</div>`;
+  }
+}
+
+/* ════════════════════════════════════
+   VISUAL INTELLIGENCE — face-api.js
+   Real face detection, expression analysis, landmark-based gaze estimation
+════════════════════════════════════ */
+let faceApiReady = false;
+let faceApiLoading = false;
+
+async function loadFaceApi() {
+  if (faceApiReady || faceApiLoading) return;
+  faceApiLoading = true;
+  try {
+    const MODEL_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
+    ]);
+    faceApiReady = true;
+    console.log("[face-api] Models loaded ✓");
+  } catch (e) {
+    console.warn("[face-api] Could not load models:", e.message);
+  }
+  faceApiLoading = false;
+}
+
+// Rolling buffer of recent face detections for smoothing
+const _faceBuffer = [];
+const FACE_BUFFER_SIZE = 5;
+
+// Start continuous face sampling every 2s while camera is live
+let _faceIntervalId = null;
+function startFaceSampling() {
+  loadFaceApi();
+  if (_faceIntervalId) return;
+  _faceIntervalId = setInterval(_sampleFace, 2000);
+}
+function stopFaceSampling() {
+  if (_faceIntervalId) { clearInterval(_faceIntervalId); _faceIntervalId = null; }
+}
+
+async function _sampleFace() {
+  if (!faceApiReady || !videoStream) return;
+  const video = document.getElementById("videoFeed");
+  if (!video || video.readyState < 2) return;
+  try {
+    const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 });
+    const result = await faceapi
+      .detectSingleFace(video, opts)
+      .withFaceLandmarks(true)
+      .withFaceExpressions();
+    if (result) {
+      _faceBuffer.push(_analyseFaceResult(result, video));
+      if (_faceBuffer.length > FACE_BUFFER_SIZE) _faceBuffer.shift();
+    }
+  } catch (e) { /* silent */ }
+}
+
+function _analyseFaceResult(result, video) {
+  const { detection, landmarks, expressions } = result;
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 480;
+  const box = detection.box;
+
+  // ── Eye contact: face should be centred & looking forward ──
+  const faceCentreX = box.x + box.width / 2;
+  const faceCentreY = box.y + box.height / 2;
+  const normX = Math.abs(faceCentreX / vw - 0.5);  // 0 = perfect centre
+  const normY = Math.abs(faceCentreY / vh - 0.5);
+  const eyeContact = Math.round(Math.max(0, 100 - (normX + normY) * 180));
+
+  // ── Posture proxy: face size relative to frame ──
+  // Too small → leaning back; too large → too close; ideal ~15-35% of frame height
+  const faceFrac = box.height / vh;
+  const postureRaw = faceFrac < 0.05 ? 40
+    : faceFrac < 0.12 ? 60
+    : faceFrac < 0.45 ? 85
+    : 65;
+  const posture = Math.min(100, postureRaw + Math.round(detection.score * 10));
+
+  // ── Expressions → nervousness & engagement ──
+  const nervous = Math.round(
+    ((expressions.fearful || 0) + (expressions.disgusted || 0) * 0.5 + (expressions.sad || 0) * 0.3) * 100
+  );
+  const engagement = Math.round(
+    (1 - ((expressions.neutral || 0) * 0.3)) *
+    (detection.score) * 100
+  );
+
+  return {
+    eyeContactScore: Math.min(100, Math.max(0, eyeContact)),
+    postureScore:    Math.min(100, Math.max(0, posture)),
+    engagementScore: Math.min(100, Math.max(0, engagement)),
+    nervousness:     Math.min(100, Math.max(0, nervous)),
+    _detected: true,
+  };
+}
+
+function _avgFaceBuffer() {
+  if (!_faceBuffer.length) return null;
+  const n = _faceBuffer.length;
+  return {
+    eyeContactScore: Math.round(_faceBuffer.reduce((s,f)=>s+f.eyeContactScore,0)/n),
+    postureScore:    Math.round(_faceBuffer.reduce((s,f)=>s+f.postureScore,0)/n),
+    engagementScore: Math.round(_faceBuffer.reduce((s,f)=>s+f.engagementScore,0)/n),
+    nervousness:     Math.round(_faceBuffer.reduce((s,f)=>s+f.nervousness,0)/n),
+    _detected: true,
+  };
+}
+
+function captureVisualScore() {
+  if (!videoStream) return null;
+  const tracks = videoStream.getVideoTracks();
+  if (!tracks.length || tracks[0].readyState !== "live") return null;
+
+  // Return averaged real scores; fall back gracefully if models not loaded yet
+  if (faceApiReady && _faceBuffer.length) {
+    return _avgFaceBuffer();
+  }
+  // Models still loading — return null so UI shows "analysing…" rather than fake data
+  return faceApiReady ? null : { _loading: true, eyeContactScore: null, postureScore: null, engagementScore: null, nervousness: null };
+}
+
+function renderVideoMetrics(vScore) {
+  if (!vScore) return;
+  if (vScore._loading) {
+    document.getElementById("videoMetrics").innerHTML =
+      `<div style="font-size:0.78rem; color:var(--text3);">🔍 Loading CV models… visual scores will appear next answer.</div>`;
+    return;
+  }
+  if (vScore.eyeContactScore === null) return;
+  document.getElementById("videoMetrics").innerHTML = `
+    <div style="font-size:0.78rem; color:var(--text3); margin-bottom:6px;">Last answer visual scores (face-api.js):</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      ${mBox("Engagement",  vScore.engagementScore, vScore.engagementScore >= 75 ? "score-high" : "score-mid")}
+      ${mBox("Eye contact", vScore.eyeContactScore, vScore.eyeContactScore >= 70 ? "score-high" : "score-mid")}
+      ${mBox("Posture",     vScore.postureScore,    vScore.postureScore    >= 70 ? "score-high" : "score-mid")}
+    </div>`;
+  document.getElementById("videoFeedbackPanel").style.display = "block";
+  document.getElementById("videoMetricsFeedback").innerHTML =
+    mBox("Engagement",  vScore.engagementScore, vScore.engagementScore >= 75 ? "score-high":"score-mid") +
+    mBox("Eye contact", vScore.eyeContactScore, vScore.eyeContactScore >= 70 ? "score-high":"score-mid") +
+    mBox("Posture",     vScore.postureScore,    vScore.postureScore    >= 70 ? "score-high":"score-mid") +
+    mBox("Nervousness", vScore.nervousness,     vScore.nervousness     <= 30 ? "score-high": vScore.nervousness <= 50 ? "score-mid":"score-low");
+}
+
+function mBox(label, val, cls) {
+  return `<div class="audio-metric" style="min-width:80px;">
+    <div class="metric-val ${cls}">${val}</div>
+    <div class="metric-label">${label}</div>
+  </div>`;
+}
+
+/* ════════════════════════════════════
+   SPEECH RECOGNITION
+   — auto-restarts on network errors
+════════════════════════════════════ */
+let recognition      = null;
+let finalBuffer      = "";
+let isRecording      = false;
+let micRetryCount    = 0;
+const MIC_MAX_RETRY  = 3;
+
+function initSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { document.getElementById("speechUnsupported").style.display = "block"; return; }
+
+  recognition = new SR();
+  recognition.continuous     = true;
+  recognition.interimResults = true;
+  recognition.lang           = "en-US";
+
+  recognition.onresult = (e) => {
+    micRetryCount = 0; // successful result resets retry count
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalBuffer += t + " ";
+      else interim += t;
+    }
+    const base = document.getElementById("answerInput").dataset.baseText || "";
+    document.getElementById("answerInput").value = base + finalBuffer + interim;
+    document.getElementById("interimText").textContent = interim ? `"${interim}"` : "";
+  };
+
+  recognition.onerror = (e) => {
+    console.warn("Speech error:", e.error);
+    if (e.error === "network") {
+      // Network error — auto retry up to MIC_MAX_RETRY times
+      if (isRecording && micRetryCount < MIC_MAX_RETRY) {
+        micRetryCount++;
+        document.getElementById("interimText").textContent =
+          `⚠ Mic network error. Auto-retrying (${micRetryCount}/${MIC_MAX_RETRY})…`;
+        setTimeout(() => {
+          if (isRecording) {
+            try { recognition.start(); } catch {}
+          }
+        }, 1500);
+      } else if (micRetryCount >= MIC_MAX_RETRY) {
+        toast("Speech recognition network error. Please type your answer instead.", "error");
+        document.getElementById("interimText").textContent = "⚠ Speech unavailable. Please type.";
+        _micOff();
+      }
+      return;
+    }
+    if (e.error === "not-allowed") {
+      toast("Microphone permission denied. Please allow mic access.", "error");
+      _micOff();
+      return;
+    }
+    if (e.error !== "no-speech") {
+      toast(`Mic error: ${e.error}. Try again.`, "error");
+      _micOff();
+    }
+  };
+
+  recognition.onend = () => {
+    // Only restart if still supposed to be recording AND not a fatal error
+    if (isRecording && micRetryCount < MIC_MAX_RETRY) {
+      try { recognition.start(); } catch {}
+    }
+  };
+}
+
+/* ════════════════════════════════════
+   MEDIA RECORDER
+════════════════════════════════════ */
+let mediaRecorder = null;
+let audioChunks   = [];
+let audioStream   = null;
+let analyserNode  = null;
+let audioCtx      = null;
+let waveAnimFrame = null;
+
+async function initMediaRecorder() {
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    document.getElementById("audioStatusBadge").style.display = "inline-flex";
+    audioCtx     = new (window.AudioContext || window.webkitAudioContext)();
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 256;
+    audioCtx.createMediaStreamSource(audioStream).connect(analyserNode);
+  } catch (err) { console.warn("Audio capture unavailable:", err.message); }
+}
+
+function getSupportedMimeType() {
+  const types = ["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus","audio/mp4"];
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || "";
+}
+
+function toggleMic() { isRecording ? stopMic() : startMic(); }
+
+function startMic() {
+  if (!audioStream) { toast("Microphone not available.", "error"); return; }
+  const ta = document.getElementById("answerInput");
+  ta.dataset.baseText = ta.value;
+  finalBuffer   = "";
+  audioChunks   = [];
+  micRetryCount = 0;
+
+  try {
+    mediaRecorder = new MediaRecorder(audioStream, { mimeType: getSupportedMimeType() });
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.start(200);
+  } catch (err) { console.warn("MediaRecorder error:", err); }
+
+  try { if (recognition) recognition.start(); } catch {}
+  startWaveform();
+  isRecording = true;
+  document.getElementById("micBtn").classList.add("recording");
+  document.getElementById("micLabel").textContent = "Stop";
+}
+
+function stopMic() { _micOff(); }
+
+function _micOff() {
+  isRecording = false;
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    try { mediaRecorder.stop(); } catch {}
+  }
+  if (recognition) { try { recognition.stop(); } catch {} }
+  stopWaveform();
+  document.getElementById("micBtn").classList.remove("recording");
+  document.getElementById("micLabel").textContent = "Speak";
+  document.getElementById("interimText").textContent = "";
+  delete document.getElementById("answerInput").dataset.baseText;
+  finalBuffer = "";
+}
+
+function startWaveform() {
+  if (!analyserNode) return;
+  const canvas = document.getElementById("waveCanvas");
+  canvas.classList.add("active");
+  const ctx  = canvas.getContext("2d");
+  const data = new Uint8Array(analyserNode.frequencyBinCount);
+  function draw() {
+    waveAnimFrame = requestAnimationFrame(draw);
+    analyserNode.getByteTimeDomainData(data);
+    const W = canvas.offsetWidth, H = canvas.offsetHeight;
+    canvas.width = W; canvas.height = H;
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle = "#ff6b6b"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const sliceW = W / data.length;
+    let x = 0;
+    for (let i = 0; i < data.length; i++) {
+      const y = ((data[i]/128.0)*H)/2;
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      x += sliceW;
+    }
+    ctx.lineTo(W, H/2); ctx.stroke();
+  }
+  draw();
+}
+
+function stopWaveform() {
+  if (waveAnimFrame) cancelAnimationFrame(waveAnimFrame);
+  document.getElementById("waveCanvas").classList.remove("active");
+}
+
+function getAudioBlob() {
+  return new Promise((resolve) => {
+    if (!mediaRecorder || audioChunks.length === 0) { resolve(null); return; }
+    if (mediaRecorder.state !== "inactive") {
+      mediaRecorder.onstop = () =>
+        resolve(new Blob(audioChunks, { type: getSupportedMimeType() || "audio/webm" }));
+      try { mediaRecorder.stop(); } catch { resolve(null); }
+    } else {
+      resolve(new Blob(audioChunks, { type: getSupportedMimeType() || "audio/webm" }));
+    }
+  });
+}
+
+/* ════════════════════════════════════
+   INTERVIEW FLOW
+════════════════════════════════════ */
+async function startInterview() {
+  const resumeData = State.get("resumeData");
+  const role       = State.get("selectedRole");
+  if (!resumeData || !role) { toast("Missing resume or role", "error"); return; }
+
+  showRateLimit(false);
+
+  // 60-second timeout — if Gemini takes longer, show error instead of hanging forever
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const res = await fetch("/api/interview/start", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      signal:  controller.signal,
+      body: JSON.stringify({
+        role,
+        resume_summary:   resumeData.summary,
+        skills:           resumeData.skills,
+        experience_years: resumeData.experience_years,
+        skill_gaps:       resumeData.skill_gaps?.[role] || [],
+      }),
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Server error" }));
+      const msg = err.detail || "Failed to start interview";
+      if (msg.toLowerCase().includes("rate limit") || msg.toLowerCase().includes("quota")) {
+        showRateLimit(true, "Gemini API rate limit hit. Retrying automatically in the background…");
+        // Auto-retry after 15 seconds
+        setTimeout(() => startInterview(), 15000);
+        return;
+      }
+      throw new Error(msg);
+    }
+
+    const data        = await res.json();
+    currentQuestion   = data.question;
+    currentDifficulty = data.difficulty || "warm-up";
+    currentTopic      = data.topic || "";
+    usedTopics.push(currentTopic);
+    showRateLimit(false);
+    renderQuestion();
+
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.error("startInterview error:", err);
+
+    if (err.name === "AbortError") {
+      // Timeout hit — show retry button
+      document.getElementById("question").innerHTML = `
+        <span style="color:var(--coral); font-size:1rem; font-weight:400;">
+          ⏱ Request timed out (Gemini is slow right now).
+        </span>`;
+      showRetryButton();
+      return;
+    }
+
+    // Generic error — show in question box + retry button
+    document.getElementById("question").innerHTML = `
+      <span style="color:var(--coral); font-size:1rem; font-weight:400;">
+        ⚠ ${err.message}
+      </span>`;
+    showRetryButton();
+  }
+}
+
+function showRetryButton() {
+  // Remove any existing retry button first
+  const existing = document.getElementById("retryBtn");
+  if (existing) existing.remove();
+
+  const btn = document.createElement("button");
+  btn.id = "retryBtn";
+  btn.className = "btn btn-outline mt-16";
+  btn.textContent = "🔄 Retry — Load Question";
+  btn.onclick = () => {
+    btn.remove();
+    document.getElementById("question").innerHTML = `
+      <span style="color:var(--text3); font-size:1rem; font-weight:400;">
+        <span class="spinner" style="display:inline-block; vertical-align:middle; margin-right:10px;"></span>
+        Retrying…
+      </span>`;
+    startInterview();
+  };
+  // Insert after the question div
+  document.getElementById("question").insertAdjacentElement("afterend", btn);
+}
+
+function renderQuestion() {
+  document.getElementById("question").innerText = currentQuestion;
+  document.getElementById("qCounter").textContent = `(${questionIndex+1} / ${TOTAL_QUESTIONS})`;
+  document.getElementById("progressFill").style.width = `${((questionIndex+1)/TOTAL_QUESTIONS)*100}%`;
+
+  const diffMap = {
+    "warm-up": { cls:"badge-teal",  label:"Warm-up" },
+    "mid":     { cls:"badge-amber", label:"Mid"     },
+    "tough":   { cls:"badge-coral", label:"Tough"   },
+  };
+  const d = diffMap[currentDifficulty] || { cls:"badge-gray", label: currentDifficulty };
+  const badge = document.getElementById("difficultyBadge");
+  badge.className = `badge ${d.cls}`;
+  badge.textContent = d.label;
+
+  document.getElementById("topicPill").textContent = currentTopic || "";
+}
+
+function showRateLimit(show, msg) {
+  const el = document.getElementById("rateLimitBanner");
+  el.style.display = show ? "block" : "none";
+  if (show && msg) el.innerHTML = `⏳ ${msg}`;
+}
+
+function showAdaptiveBanner(score) {
+  const b = document.getElementById("adaptiveBanner");
+  if (score <= 4) {
+    b.style.display = "block";
+    b.className = "easier";
+    b.textContent = "💡 Adapting: Moving to a more foundational question to build momentum.";
+  } else if (score >= 8) {
+    b.style.display = "block";
+    b.className = "harder";
+    b.textContent = "🔥 Excellent! Increasing difficulty for the next question.";
+  } else {
+    b.style.display = "none";
+  }
+}
+
+async function submitAnswer() {
+  if (isRecording) _micOff();
+
+  const answer = document.getElementById("answerInput").value.trim();
+  if (!answer) { toast("Please provide an answer before submitting.", "error"); return; }
+
+  const status     = document.getElementById("status");
+  const statusText = document.getElementById("statusText");
+  status.style.display = "flex";
+  statusText.textContent = "Evaluating…";
+  document.getElementById("nextBtn").disabled = true;
+  showRateLimit(false);
+
+  const vScore = captureVisualScore();
+
+  // Fire LLM + audio in parallel
+  const llmPromise = fetch("/api/interview/answer", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      role:            State.get("selectedRole"),
+      resume_summary:  State.get("resumeData").summary,
+      question:        currentQuestion,
+      answer,
+      history,
+      question_number: questionNumber,
+      skill_gaps:      State.get("resumeData")?.skill_gaps?.[State.get("selectedRole")] || [],
+    }),
+  });
+
+  const audioBlob = await getAudioBlob();
+  let audioPromise = Promise.resolve(null);
+  if (audioBlob && audioBlob.size > 1000) {
+    statusText.textContent = "Evaluating + analysing audio…";
+    const fd = new FormData();
+    fd.append("audio", audioBlob, "answer.webm");
+    fd.append("transcript", answer);
+    audioPromise = fetch("/api/interview/analyse-audio", {
+      method:"POST", body: fd,
+    }).then(r => r.ok ? r.json() : null).catch(() => null);
+  }
+
+  try {
+    const [llmRes, audioData] = await Promise.all([llmPromise, audioPromise]);
+
+    if (!llmRes.ok) {
+      const err = await llmRes.json();
+      if (err.detail && (err.detail.includes("rate limit") || err.detail.includes("Rate limit"))) {
+        showRateLimit(true, "Rate limit hit. The server is retrying automatically. Please wait…");
+      }
+      throw new Error(err.detail || "Failed to submit answer");
+    }
+
+    const llmData = await llmRes.json();
+    showRateLimit(false);
+
+    // Track topic for diversity
+    const nextTopic = llmData.next_question?.topic || "";
+    videoScores.push(vScore);
+    renderVideoMetrics(vScore);
+
+    history.push({
+      question:         currentQuestion,
+      topic:            currentTopic,
+      question_type:    llmData.question_type || "unknown",
+      answer,
+      feedback:         llmData.feedback,
+      score:            llmData.score,
+      confidence_score: audioData?.confidence_score ?? null,
+      clarity_score:    audioData?.clarity_score    ?? null,
+      pace_wpm:         audioData?.pace_wpm         ?? null,
+      tone:             audioData?.tone             ?? null,
+      hesitation_count: audioData?.hesitation_count ?? null,
+      engagement_score: vScore?.engagementScore     ?? null,
+      eye_contact:      vScore?.eyeContactScore     ?? null,
+      posture:          vScore?.postureScore        ?? null,
+    });
+
+    showFeedback(llmData, audioData);
+    showAdaptiveBanner(llmData.score);
+
+    questionIndex++;
+    questionNumber++;
+    document.getElementById("answerInput").value = "";
+    document.getElementById("interimText").textContent = "";
+    audioChunks = [];
+
+    if (questionIndex >= TOTAL_QUESTIONS || llmData.is_final) {
+      endInterview();
+      return;
+    }
+
+    currentQuestion   = llmData.next_question.question;
+    currentDifficulty = llmData.next_question.difficulty || currentDifficulty;
+    currentTopic      = nextTopic;
+    usedTopics.push(currentTopic);
+    renderQuestion();
+
+  } catch (err) {
+    console.error(err);
+    toast("Error: " + err.message, "error");
+  }
+
+  status.style.display = "none";
+  document.getElementById("nextBtn").disabled = false;
+}
+
+/* ════════════════════════════════════
+   FEEDBACK RENDERING
+════════════════════════════════════ */
+function showFeedback(llmData, audioData) {
+  const card = document.getElementById("feedbackCard");
+  const s = llmData.score;
+  const sColor = s >= 7 ? "var(--teal)" : s >= 5 ? "var(--amber)" : "var(--coral)";
+  document.getElementById("feedbackText").innerHTML = `
+    <div class="score-bar-row">
+      <strong style="min-width:130px;">Content: ${s}/10</strong>
+      <div class="score-bar-track">
+        <div class="score-bar-fill" style="width:${s*10}%; background:${sColor};"></div>
+      </div>
+    </div>
+    <div class="mt-8" style="color:var(--text2); font-size:0.9rem;">${llmData.feedback}</div>`;
+
+  const panel = document.getElementById("audioAnalysis");
+  if (audioData && audioData.confidence_score !== null) {
+    panel.style.display = "block";
+    renderAudioMetrics(audioData);
+  } else {
+    panel.style.display = "none";
+  }
+
+  card.style.display = "block";
+  card.scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+
+function renderAudioMetrics(d) {
+  const confCls = scoreClass(d.confidence_score);
+  const clarCls = scoreClass(d.clarity_score);
+  document.getElementById("audioMetrics").innerHTML = `
+    ${mBox2("Confidence", d.confidence_score ?? "—", confCls, (d.confidence_score||0)*10)}
+    ${mBox2("Clarity",    d.clarity_score    ?? "—", clarCls, (d.clarity_score||0)*10)}
+    <div class="audio-metric">
+      <div class="metric-val" style="font-size:1rem; padding-top:4px;">
+        <span class="tone-badge tone-${d.tone}">${d.tone}</span>
+      </div>
+      <div class="metric-label" style="margin-top:8px;">Tone</div>
+    </div>
+    <div class="audio-metric">
+      <div class="metric-val" style="color:var(--text2); font-size:1.1rem;">${d.pace_wpm > 0 ? d.pace_wpm+" WPM":"—"}</div>
+      <div class="metric-label">Pace</div>
+    </div>
+    <div class="audio-metric">
+      <div class="metric-val" style="color:${d.hesitation_count >= 3 ? "var(--coral)":"var(--teal)"};">${d.hesitation_count}</div>
+      <div class="metric-label">Pauses</div>
+    </div>
+    <div class="audio-metric">
+      <div class="metric-val" style="color:var(--text2); font-size:1.1rem;">${d.duration_sec}s</div>
+      <div class="metric-label">Duration</div>
+    </div>`;
+  document.getElementById("audioNotes").innerHTML =
+    (d.feedback_notes||[]).map(n=>`<li>• ${n}</li>`).join("");
+}
+
+function mBox2(label, val, cls, pct) {
+  return `<div class="audio-metric">
+    <div class="metric-val ${cls}">${val}</div>
+    <div class="metric-label">${label}</div>
+    <div class="score-bar-track" style="margin-top:8px;">
+      <div class="score-bar-fill" style="width:${pct}%; background:currentColor;"></div>
+    </div>
+  </div>`;
+}
+
+function scoreClass(v) {
+  if (v === null || v === undefined) return "score-mid";
+  return v >= 7 ? "score-high" : v >= 4.5 ? "score-mid" : "score-low";
+}
+
+/* ════════════════════════════════════
+   FINAL REPORT
+════════════════════════════════════ */
+async function endInterview() {
+  document.getElementById("nextBtn").style.display  = "none";
+  document.getElementById("adaptiveBanner").style.display = "none";
+
+  const avgConf = avg(history.map(h=>h.confidence_score).filter(v=>v!==null));
+  const avgClar = avg(history.map(h=>h.clarity_score).filter(v=>v!==null));
+  const avgEng  = avg(videoScores.filter(Boolean).map(v=>v.engagementScore));
+  const avgEye  = avg(videoScores.filter(Boolean).map(v=>v.eyeContactScore));
+  const avgPost = avg(videoScores.filter(Boolean).map(v=>v.postureScore));
+
+  document.getElementById("status").style.display  = "flex";
+  document.getElementById("statusText").textContent = "Generating final report…";
+
+  try {
+    const res  = await fetch("/api/interview/feedback", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ role: State.get("selectedRole"), history }),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || "Report failed");
+    const data = await res.json();
+    renderFinal(data, { avgConf, avgClar, avgEng, avgEye, avgPost });
+  } catch (err) {
+    toast("Failed to generate report: " + err.message, "error");
+  }
+  document.getElementById("status").style.display = "none";
+}
+
+function renderFinal(data, v) {
+  const mkBar = (label, val, color, max=10) => val !== null && val !== undefined ? `
+    <div class="score-bar-row mt-8">
+      <strong style="min-width:200px; font-size:0.88rem;">${label}: ${typeof val === "number" ? val.toFixed(1) : val}${max===100?"/100":"/10"}</strong>
+      <div class="score-bar-track">
+        <div class="score-bar-fill" style="width:${(val/max)*100}%; background:${color};"></div>
+      </div>
+    </div>` : "";
+
+  const verdictColor = { "Strong Hire":"var(--teal)","Hire":"var(--amber)","Borderline":"var(--coral)","No Hire":"var(--coral)" }[data.overall_verdict] || "var(--amber)";
+
+  document.getElementById("finalContent").innerHTML = `
+    <div class="final-section-title">Technical</div>
+    ${mkBar("Content score", data.overall_score, "var(--amber)", 100)}
+
+    <div class="final-section-title">Audio Delivery</div>
+    ${v.avgConf !== null ? mkBar("Avg. confidence", v.avgConf, "var(--teal)") : "<p style='color:var(--text3);font-size:0.84rem;'>Audio analysis unavailable.</p>"}
+    ${mkBar("Avg. clarity", v.avgClar, "var(--coral)")}
+    ${data.communication_insights ? `<p style="color:var(--text2); font-size:0.87rem; margin-top:8px; line-height:1.7;">${data.communication_insights}</p>` : ""}
+
+    <div class="final-section-title">Visual Presence</div>
+    ${v.avgEng !== null ? mkBar("Avg. engagement",  v.avgEng,  "var(--teal)",  100) : "<p style='color:var(--text3);font-size:0.84rem;'>Camera was unavailable.</p>"}
+    ${v.avgEye !== null ? mkBar("Avg. eye contact",  v.avgEye,  "var(--amber)", 100) : ""}
+    ${v.avgPost!== null ? mkBar("Avg. posture",      v.avgPost, "var(--teal)",  100) : ""}
+
+    <div class="divider"></div>
+
+    <div class="final-section-title">Summary</div>
+    <p style="color:var(--text2); font-size:0.9rem; line-height:1.8;">${data.summary}</p>
+
+    <div class="final-section-title">Strengths</div>
+    <ul style="color:var(--text2); font-size:0.88rem; line-height:2.1; padding-left:16px;">
+      ${(data.strengths||[]).map(s=>`<li>✓ ${s}</li>`).join("")}
+    </ul>
+
+    <div class="final-section-title">Areas to Improve</div>
+    <ul style="color:var(--text2); font-size:0.88rem; line-height:2.1; padding-left:16px;">
+      ${(data.areas_to_improve||[]).map(s=>`<li>→ ${s}</li>`).join("")}
+    </ul>
+
+    <div class="final-section-title">Recommended Resources</div>
+    <ul style="color:var(--text2); font-size:0.88rem; line-height:2.1; padding-left:16px;">
+      ${(data.recommended_resources||[]).map(r=>`<li>📚 ${r}</li>`).join("")}
+    </ul>
+
+    <div class="divider"></div>
+    <div class="final-section-title">Verdict</div>
+    <span class="verdict-badge" style="background:rgba(255,255,255,0.06); border:1px solid ${verdictColor}; color:${verdictColor};">
+      ${data.overall_verdict || "—"}
+    </span>
+
+    <div class="mt-24 flex gap-12" style="flex-wrap:wrap;">
+      <a href="/resume.html" class="btn btn-secondary">← Back to Resume</a>
+      <a href="/jobs.html"   class="btn btn-primary">View Job Matches →</a>
+    </div>`;
+
+  const report = document.getElementById("finalReport");
+  report.style.display = "block";
+  report.scrollIntoView({ behavior:"smooth" });
+}
+
+function avg(arr) {
+  return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+}
+</script>
+</body>
+</html>
